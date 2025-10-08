@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelCutie — Stickerboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pink: #ffb6d9;
+    --blue: #c8e6ff;
+    --accent: #ff66b3;
+    --bg-gradient: linear-gradient(135deg, var(--pink), var(--blue));
+  }
+
+  * {
+    box-sizing: border-box;
+    user-select: none;
+  }
+
+  body {
+    margin: 0;
+    font-family: 'Press Start 2P', monospace;
+    background: var(--bg-gradient);
+    color: #333;
+    overflow: hidden;
+  }
+
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    color: var(--accent);
+    text-shadow: 0 2px 0 #fff;
+    margin-bottom: 12px;
+  }
+
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+  }
+
+  header p {
+    font-size: 10px;
+    margin-top: 5px;
+    color: #444;
+  }
+
+  .board {
+    width: 900px;
+    max-width: 95vw;
+    height: 450px;
+    background: rgba(255,255,255,0.85);
+    border: 3px solid #fff;
+    border-radius: 10px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    display: flex;
+  }
+
+  .sidebar {
+    width: 220px;
+    background: #fff;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    border-right: 3px solid #ffccf0;
+  }
+
+  .icons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .icon {
+    background: #ffe4f5;
+    width: 58px;
+    height: 58px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.08);
+    transition: transform .15s;
+  }
+
+  .icon:hover {
+    transform: scale(1.1);
+  }
+
+  .canvas {
+    flex: 1;
+    position: relative;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0 10px, transparent 10px 20px);
+    cursor: none;
+  }
+
+  .counter {
+    text-align: center;
+    margin-top: 8px;
+    font-size: 10px;
+  }
+
+  .button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 6px;
+    font-family: inherit;
+    cursor: pointer;
+    font-size: 10px;
+    margin-top: 10px;
+  }
+
+  .button:hover {
+    opacity: 0.85;
+  }
+
+  .confetti {
+    position: fixed;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    opacity: 0.95;
+    pointer-events: none;
+    z-index: 999;
+    animation: fall 1.2s linear forwards;
+  }
+
+  @keyframes fall {
+    to { transform: translateY(90vh) rotate(180deg); opacity: 0; }
+  }
+
+  .pixel-cursor {
+    position: fixed;
+    width: 24px;
+    height: 24px;
+    background: var(--accent);
+    border: 2px solid #fff;
+    border-radius: 4px;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 9999;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.1);
+  }
+
+  .placed {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    font-size: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: grab;
+  }
+
+  @media(max-width: 600px){
+    header h1{font-size: 16px;}
+    .sidebar{width:160px;}
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>PixelCutie 💖</h1>
+      <p>Drag & drop cute stickers!</p>
+    </header>
+
+    <div class="board">
+      <div class="sidebar">
+        <div>
+          <div class="icons" id="icons">
+            <div class="icon">💖</div>
+            <div class="icon">🌸</div>
+            <div class="icon">🎀</div>
+            <div class="icon">🌈</div>
+            <div class="icon">⭐</div>
+            <div class="icon">☁️</div>
+            <div class="icon">🐱</div>
+            <div class="icon">🍰</div>
+            <div class="icon">🦋</div>
+          </div>
+          <div class="counter">Collected: <span id="count">0</span></div>
+        </div>
+        <button class="button" id="clear">Clear Board</button>
+      </div>
+
+      <div class="canvas" id="canvas"></div>
+    </div>
+  </div>
+
+  <div class="pixel-cursor" id="cursor"></div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const icons = document.getElementById('icons');
+const counter = document.getElementById('count');
+const cursor = document.getElementById('cursor');
+let count = 0;
+
+// Handle icon clicks -> place stickers
+icons.addEventListener('click', e => {
+  const icon = e.target.closest('.icon');
+  if (!icon) return;
+  placeSticker(icon.textContent);
+  count++;
+  counter.textContent = count;
+  confettiBurst();
+});
+
+// Place sticker at random position on canvas
+function placeSticker(symbol){
+  const el = document.createElement('div');
+  el.className = 'placed';
+  el.textContent = symbol;
+  el.style.left = (Math.random() * (canvas.clientWidth - 60)) + 'px';
+  el.style.top = (Math.random() * (canvas.clientHeight - 60)) + 'px';
+  makeDraggable(el);
+  canvas.appendChild(el);
+}
+
+// Make draggable
+function makeDraggable(el){
+  let offsetX, offsetY, dragging = false;
+  el.addEventListener('pointerdown', e=>{
+    dragging = true;
+    offsetX = e.clientX - el.offsetLeft;
+    offsetY = e.clientY - el.offsetTop;
+    el.setPointerCapture(e.pointerId);
+    el.style.cursor = 'grabbing';
+  });
+  el.addEventListener('pointermove', e=>{
+    if(!dragging) return;
+    el.style.left = (e.clientX - offsetX) + 'px';
+    el.style.top = (e.clientY - offsetY) + 'px';
+  });
+  el.addEventListener('pointerup', ()=>{
+    dragging = false;
+    el.style.cursor = 'grab';
+  });
+}
+
+// Confetti
+function confettiBurst(){
+  const colors = ['#FF9AD6','#8EE0FF','#FFF6A7','#FFD1E8','#C6FFD9'];
+  for(let i=0;i<15;i++){
+    const c = document.createElement('div');
+    c.className='confetti';
+    c.style.left = (Math.random()*window.innerWidth)+'px';
+    c.style.top = '0px';
+    c.style.background = colors[Math.floor(Math.random()*colors.length)];
+    document.body.appendChild(c);
+    setTimeout(()=>c.remove(),1200);
+  }
+}
+
+// Clear board
+document.getElementById('clear').addEventListener('click', ()=>{
+  canvas.innerHTML = '';
+  count = 0;
+  counter.textContent = count;
+  confettiBurst();
+});
+
+// Pixel cursor follow
+window.addEventListener('mousemove', e=>{
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+</script>
+</body>
+</html>
